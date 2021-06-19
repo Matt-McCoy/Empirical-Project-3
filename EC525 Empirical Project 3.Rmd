@@ -1,0 +1,102 @@
+---
+title: "Empirical Project 3"
+author: "Matt McCoy"
+date: "6/2/2021"
+output: html_document
+---
+
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+```{r}
+## Install the pacman package if necessary
+if (!require("pacman")) install.packages("pacman")
+## Install other packages using pacman::p_load()
+pacman::p_load(tidyverse, haven, sandwich, lmtest, stargazer, dplyr, ggplot2, broom, magrittr)
+
+getwd()
+#load in data
+nbp_df <- read_dta(file = "nbp.dta")
+```
+
+
+```{r}
+#subset data to only NBP participants
+nbp_new <- subset(nbp_df, nbp ==1, select =
+c(fips_county, fips_state, year, summer, post, nox_emit))
+
+#nbp_new_new <- subset(nbp_new, summer ==1, select =
+#c(fips_county, fips_state, year, post, nox_emit))
+
+#nbp_solid <- nbp_new_new %>%
+  #group_by(year) %>% 
+  #summarise(nox_emit = mean(nox_emit, na.rm = TRUE))
+```
+
+
+```{r}
+#re-create Panel A
+nbp_new %>% group_by(year, summer) %>% 
+  summarise(nox_emit = mean(nox_emit, na.rm = TRUE)) %>% 
+  ggplot(aes(x = year, y = nox_emit, color = summer, group = summer)) + geom_point() + geom_vline(xintercept=2002,linetype="longdash") +
+  geom_line(aes(linetype = as.factor(-summer))) + ggtitle("States Participating in NBP") + 
+  labs(y="NOx Emissions (Mil. Tons)", x = "Year") + theme(legend.position = "none") + scale_x_continuous(breaks = 0:2100)  + ylim(.3, 1.6)
+
+```
+
+```{r}
+#First DD corresponding to Panel A
+rega <- lm(nox_emit ~ summer*post, data = nbp_new)
+
+stargazer(rega, type = 'text')
+```
+
+
+```{r}
+#subset data for Panel B, contains only non participating states
+
+ nbp_b <- subset(nbp_df, nbp ==0, select =
+c(fips_county, fips_state, year, summer, post, nox_emit))
+
+#Re-create Panel B
+nbp_b %>% group_by(year, summer) %>% 
+  summarise(nox_emit = mean(nox_emit, na.rm = TRUE)) %>% 
+  ggplot(aes(x = year, y = nox_emit, color = summer, group = summer)) + geom_point() + geom_vline(xintercept=2002,linetype="longdash") +
+  geom_line(aes(linetype = as.factor(-summer))) + ggtitle("States Not Participating in NBP") + 
+  labs(y="NOx Emissions (Mil. Tons)", x = "Year") + theme(legend.position = "none") + scale_x_continuous(breaks = 0:2100) + ylim(0.3, 1.6)
+
+
+```
+
+```{r}
+#DD corresponding to Panel B
+regb <- lm(nox_emit ~ summer*post, data = nbp_b)
+
+stargazer(regb, type = 'text')
+```
+
+```{r}
+# Extract just the diff-in-diff estimate
+#diff_diff_controls <- tidy(did_reg2) %>% 
+  #filter(term == "summer:post") %>% 
+  #pull(estimate)
+```
+
+```{r}
+#Run DDD 
+reg_triple <- lm(nox_emit ~ summer*post*nbp, data = nbp_df)
+
+stargazer(rega, regb, reg_triple, type = 'text')
+```
+
+```{r}
+#number of unique counties in the NBP
+x <- unique(nbp_new$fips_county)
+x <- as.data.frame(x)
+nrow(x)
+
+```
+
